@@ -5,18 +5,34 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import Navbar from '@/components/Navbar';
 import api from '@/lib/api';
-import { Plus } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 
 interface Placement {
   id: number;
   placement_ref: string;
   format: string;
-  client_name: string;
+  client_id?: number;
+  client_name?: string;
+  screen_id?: number;
   campaign_name: string;
+  location?: string;
   start_date: string;
   end_date: string;
   status: string;
-  price: number;
+  artwork_url?: string;
+  price?: number;
+  notes?: string;
+}
+
+interface Client {
+  id: number;
+  name: string;
+}
+
+interface Screen {
+  id: number;
+  name: string;
+  location: string;
 }
 
 export default function PlacementsPage() {
@@ -25,6 +41,23 @@ export default function PlacementsPage() {
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [loadingPlacements, setLoadingPlacements] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [screens, setScreens] = useState<Screen[]>([]);
+  const [formData, setFormData] = useState({
+    placement_ref: '',
+    format: 'MiniBoard',
+    client_id: '',
+    screen_id: '',
+    campaign_name: '',
+    location: '',
+    start_date: '',
+    end_date: '',
+    artwork_url: '',
+    price: '',
+    notes: '',
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,6 +68,8 @@ export default function PlacementsPage() {
   useEffect(() => {
     if (user) {
       fetchPlacements();
+      fetchClients();
+      fetchScreens();
     }
   }, [user, statusFilter]);
 
@@ -50,9 +85,103 @@ export default function PlacementsPage() {
     }
   };
 
+  const fetchClients = async () => {
+    try {
+      const response = await api.get('/clients');
+      setClients(response.data);
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+    }
+  };
+
+  const fetchScreens = async () => {
+    try {
+      const response = await api.get('/screens');
+      setScreens(response.data);
+    } catch (err) {
+      console.error('Error fetching screens:', err);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const submitData = {
+        placement_ref: formData.placement_ref,
+        format: formData.format,
+        client_id: formData.client_id ? parseInt(formData.client_id) : null,
+        screen_id: formData.format === 'DigiBoard' && formData.screen_id ? parseInt(formData.screen_id) : null,
+        campaign_name: formData.campaign_name,
+        location: formData.location || null,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        artwork_url: formData.artwork_url || null,
+        price: formData.price ? parseFloat(formData.price) : null,
+        notes: formData.notes || null,
+      };
+
+      if (editingPlacement) {
+        await api.put(`/placements/${editingPlacement.id}`, submitData);
+      } else {
+        await api.post('/placements', submitData);
+      }
+      setShowModal(false);
+      setEditingPlacement(null);
+      setFormData({
+        placement_ref: '',
+        format: 'MiniBoard',
+        client_id: '',
+        screen_id: '',
+        campaign_name: '',
+        location: '',
+        start_date: '',
+        end_date: '',
+        artwork_url: '',
+        price: '',
+        notes: '',
+      });
+      fetchPlacements();
+    } catch (err) {
+      console.error('Error saving placement:', err);
+      alert('Failed to save placement. Please check all required fields.');
+    }
+  };
+
+  const handleEdit = (placement: Placement) => {
+    setEditingPlacement(placement);
+    setFormData({
+      placement_ref: placement.placement_ref,
+      format: placement.format,
+      client_id: placement.client_id ? placement.client_id.toString() : '',
+      screen_id: placement.screen_id ? placement.screen_id.toString() : '',
+      campaign_name: placement.campaign_name,
+      location: placement.location || '',
+      start_date: placement.start_date.split('T')[0],
+      end_date: placement.end_date.split('T')[0],
+      artwork_url: placement.artwork_url || '',
+      price: placement.price ? placement.price.toString() : '',
+      notes: placement.notes || '',
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Are you sure you want to delete this placement?')) {
+      try {
+        await api.delete(`/placements/${id}`);
+        fetchPlacements();
+      } catch (err) {
+        console.error('Error deleting placement:', err);
+        alert('Failed to delete placement.');
+      }
+    }
+  };
+
   if (loading || !user) {
     return <div>Loading...</div>;
   }
+
+  const canEdit = user.role === 'admin' || user.role === 'staff';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,6 +214,31 @@ export default function PlacementsPage() {
                 <option value="active">Active</option>
                 <option value="completed">Completed</option>
               </select>
+              {canEdit && (
+                <button
+                  onClick={() => {
+                    setEditingPlacement(null);
+                    setFormData({
+                      placement_ref: '',
+                      format: 'MiniBoard',
+                      client_id: '',
+                      screen_id: '',
+                      campaign_name: '',
+                      location: '',
+                      start_date: '',
+                      end_date: '',
+                      artwork_url: '',
+                      price: '',
+                      notes: '',
+                    });
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Placement
+                </button>
+              )}
             </div>
           </div>
 
@@ -118,6 +272,11 @@ export default function PlacementsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Price
                     </th>
+                    {canEdit && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -144,13 +303,33 @@ export default function PlacementsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        £{placement.price ? placement.price.toFixed(2) : '0.00'}
+                        £{placement.price ? parseFloat(placement.price).toFixed(2) : '0.00'}
                       </td>
+                      {canEdit && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleEdit(placement)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </button>
+                            {user.role === 'admin' && (
+                              <button
+                                onClick={() => handleDelete(placement.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {placements.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={canEdit ? 8 : 7} className="px-6 py-8 text-center text-gray-500">
                         No placements found
                       </td>
                     </tr>
@@ -161,6 +340,185 @@ export default function PlacementsPage() {
           )}
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowModal(false)}></div>
+            <div className="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all max-w-2xl w-full z-20">
+              <form onSubmit={handleSubmit}>
+                <div className="px-6 py-4">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    {editingPlacement ? 'Edit Placement' : 'Add Placement'}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Placement Reference *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.placement_ref}
+                        onChange={(e) => setFormData({ ...formData, placement_ref: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Format *
+                      </label>
+                      <select
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.format}
+                        onChange={(e) => setFormData({ ...formData, format: e.target.value })}
+                      >
+                        <option value="MiniBoard">MiniBoard</option>
+                        <option value="DigiBoard">DigiBoard</option>
+                        <option value="Vending">Vending</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Client
+                      </label>
+                      <select
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.client_id}
+                        onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                      >
+                        <option value="">Select Client</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {formData.format === 'DigiBoard' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Screen
+                        </label>
+                        <select
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          value={formData.screen_id}
+                          onChange={(e) => setFormData({ ...formData, screen_id: e.target.value })}
+                        >
+                          <option value="">Select Screen</option>
+                          {screens.map((screen) => (
+                            <option key={screen.id} value={screen.id}>
+                              {screen.name} ({screen.location || 'No location'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className={formData.format === 'DigiBoard' ? '' : 'col-span-1'}>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Campaign Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.campaign_name}
+                        onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Location
+                      </label>
+                      <input
+                        type="text"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        End Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.end_date}
+                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Price (£)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Artwork URL
+                      </label>
+                      <input
+                        type="url"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.artwork_url}
+                        onChange={(e) => setFormData({ ...formData, artwork_url: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Notes
+                      </label>
+                      <textarea
+                        rows={3}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    {editingPlacement ? 'Update' : 'Create'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
