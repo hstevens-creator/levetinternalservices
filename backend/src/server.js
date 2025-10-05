@@ -14,6 +14,7 @@ const placementRoutes = require('./routes/placements');
 const screenRoutes = require('./routes/screens');
 const campaignRoutes = require('./routes/campaigns');
 const dashboardRoutes = require('./routes/dashboard');
+const playlistRoutes = require('./routes/playlist');
 
 const app = express();
 const server = http.createServer(app);
@@ -23,6 +24,8 @@ const io = new Server(server, {
     methods: ['GET', 'POST']
   }
 });
+
+app.set('io', io);
 
 app.use(cors());
 app.use(express.json());
@@ -38,6 +41,7 @@ app.use('/api/placements', placementRoutes);
 app.use('/api/screens', screenRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/playlist', playlistRoutes);
 
 const connectedScreens = new Map();
 
@@ -55,7 +59,7 @@ io.on('connection', (socket) => {
 
       if (result.rows.length > 0) {
         connectedScreens.set(socket.id, { screenId, playerKey });
-        socket.join(`screen:${screenId}`);
+        socket.join(`screen-${screenId}`);
         
         await pool.query(
           'UPDATE screens SET online = true, last_seen = CURRENT_TIMESTAMP WHERE id = $1',
@@ -87,6 +91,23 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('screen:error', async (data) => {
+    const screenInfo = connectedScreens.get(socket.id);
+    if (screenInfo) {
+      try {
+        await pool.query(
+          `INSERT INTO events (type, payload) 
+           VALUES ('screen_error', $1)`,
+          [JSON.stringify({ screenId: screenInfo.screenId, error: data, timestamp: new Date().toISOString() })]
+        );
+        
+        console.error(`Screen ${screenInfo.screenId} error:`, data);
+      } catch (err) {
+        console.error('Error logging screen error:', err);
+      }
+    }
+  });
+
   socket.on('disconnect', async () => {
     const screenInfo = connectedScreens.get(socket.id);
     if (screenInfo) {
@@ -109,7 +130,7 @@ app.post('/api/screens/:id/push-content', async (req, res) => {
     const { id } = req.params;
     const { content } = req.body;
 
-    io.to(`screen:${id}`).emit('content:update', content);
+    io.to(`screen-${id}`).emit('content:update', content);
 
     await pool.query(
       `INSERT INTO events (type, payload) 

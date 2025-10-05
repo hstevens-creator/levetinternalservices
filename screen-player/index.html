@@ -74,9 +74,27 @@
   </div>
   
   <div id="diagnostics">
-    <div>Screen ID: <span id="diag-screen-id">-</span></div>
-    <div>Last Heartbeat: <span id="diag-heartbeat">-</span></div>
-    <div>Content Items: <span id="diag-content-count">0</span></div>
+    <h3>DEBUG MODE (Ctrl+D to toggle)</h3>
+    <div class="diag-row">
+      <span class="diag-label">Screen ID:</span>
+      <span id="diag-screen-id">-</span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">Online:</span>
+      <span id="diag-online">-</span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">Playlist Size:</span>
+      <span id="diag-content-count">0</span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">Current Slot:</span>
+      <span id="diag-current-slot">-</span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">Last Heartbeat:</span>
+      <span id="diag-heartbeat">-</span>
+    </div>
   </div>
 
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>

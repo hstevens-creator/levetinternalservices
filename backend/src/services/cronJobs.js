@@ -1,5 +1,7 @@
 const cron = require('node-cron');
 const { pool } = require('../config/database');
+const { refreshAllScreenPlaylists } = require('./playlistManager');
+const { checkCampaignExpiry, sendWeeklyReport } = require('./notificationService');
 
 const updatePlacementStatus = async () => {
   try {
@@ -27,6 +29,8 @@ const updatePlacementStatus = async () => {
     );
 
     console.log('Placement statuses updated');
+    
+    await refreshAllScreenPlaylists();
   } catch (err) {
     console.error('Error updating placement statuses:', err);
   }
@@ -54,6 +58,10 @@ const startCronJobs = () => {
   cron.schedule('* * * * *', updatePlacementStatus);
   
   cron.schedule('* * * * *', checkOfflineScreens);
+  
+  cron.schedule('0 9 * * *', checkCampaignExpiry);
+  
+  cron.schedule('0 9 * * 1', sendWeeklyReport);
   
   console.log('Cron jobs started');
 };
