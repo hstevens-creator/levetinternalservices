@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Levet DigiBoard Player</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    
+    #player {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    #content {
+      max-width: 100%;
+      max-height: 100%;
+    }
+    
+    #status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 1000;
+    }
+    
+    .status-online {
+      color: #10b981;
+    }
+    
+    .status-offline {
+      color: #ef4444;
+    }
+    
+    #diagnostics {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-size: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="player">
+    <div id="content"></div>
+  </div>
+  
+  <div id="status">
+    <span id="status-indicator">●</span>
+    <span id="status-text">Connecting...</span>
+  </div>
+  
+  <div id="diagnostics">
+    <div>Screen ID: <span id="diag-screen-id">-</span></div>
+    <div>Last Heartbeat: <span id="diag-heartbeat">-</span></div>
+    <div>Content Items: <span id="diag-content-count">0</span></div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>
